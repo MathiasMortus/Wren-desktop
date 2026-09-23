@@ -1,0 +1,17 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Wren randomizes fingerprints in every window, the way Brave does, instead of
+# only in private windows. Each site gets its own random seed, reset every
+# browsing session: canvas and WebGL reads get faint noise, so the same
+# fingerprint can't follow you from site to site or day to day.
+- name: privacy.fingerprintingProtection
+  value: true
+
+# On top of Firefox's default set (canvas noise, fewer fonts, bucketed CPU
+# count, and others): noise in WebGL image reads, and the GPU vendor
+# reported only as a broad family. Not WebGLVendorRandomize: its
+# "Mozilla <random>" vendor is itself unusual and easy to spot.
+- name: privacy.fingerprintingProtection.overrides
+  value: "+WebGLRandomization,+WebGLVendorSanitize"
