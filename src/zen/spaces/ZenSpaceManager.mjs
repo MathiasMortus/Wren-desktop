@@ -444,6 +444,21 @@ class nsZenWorkspaces {
     return essentialsContainer;
   }
 
+  /**
+   * Spaces from older sessions, sync or another window can lack
+   * containerTabId. Zen reads it as a number everywhere (a missing one hid
+   * the Essentials row), so a missing value means 0: no container.
+   *
+   * @param {Array} workspaces
+   * @returns {Array} the same array
+   */
+  #withContainerIds(workspaces) {
+    for (const workspace of workspaces) {
+      workspace.containerTabId ??= 0;
+    }
+    return workspaces;
+  }
+
   getCurrentSpaceContainerId() {
     const currentWorkspace = this.getActiveWorkspaceFromCache();
     return typeof currentWorkspace?.containerTabId === "number"
@@ -753,7 +768,7 @@ class nsZenWorkspaces {
       spacesFromStore.push(...lazy.ZenSessionStore._migrationData.spaces);
     }
     this._workspaceCache = spacesFromStore.length
-      ? [...spacesFromStore]
+      ? this.#withContainerIds([...spacesFromStore])
       : [this.#createWorkspaceData("Space", undefined)];
     this.activeWorkspace =
       aWinData.activeZenSpace || this._workspaceCache[0].uuid;
@@ -1339,6 +1354,7 @@ class nsZenWorkspaces {
   }
 
   propagateWorkspaces(aWorkspaces) {
+    this.#withContainerIds(aWorkspaces);
     const previousWorkspaces = this._workspaceCache || [];
     let promises = [];
     let hasChanged = false;

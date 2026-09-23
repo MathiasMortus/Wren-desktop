@@ -25,6 +25,7 @@ BROWSER_CHROME_MANIFESTS += [
     "window_drag/browser.toml",
     "window_sync/browser.toml",
     "wren_privacy/browser.toml",
+    "wren_spaces/browser.toml",
     "wren_zps/browser.toml",
 ]
 
