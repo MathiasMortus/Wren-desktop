@@ -39,3 +39,6 @@ bloat-dump.log
 # Wren: pre-installed extensions, fetched by scripts/wren_addons.py
 src/zen/wren-addons/*.xpi
 src/zen/wren-addons/*.download
+
+# Wren: logs from scripts/wren_update.sh
+.wren/
