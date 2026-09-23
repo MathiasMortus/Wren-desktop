@@ -1,0 +1,93 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* ZPS: profile badges on tabs and profile rows in the spotlight. */
+
+.zps-badge {
+  flex: none;
+  margin-inline: 6px 2px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 14px;
+  text-transform: uppercase;
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--identity-tab-color, #8f8f9d) 60%, white);
+  color: color-mix(in srgb, var(--identity-tab-color, #8f8f9d) 30%, black);
+}
+
+/* The badge replaces Zen's thin container color line. */
+.tabbrowser-tab:has(.zps-badge) .tab-context-line {
+  display: none !important;
+}
+
+/* No badges on icon-only tabs: collapsed sidebar and Essentials. */
+#navigator-toolbox:not([zen-sidebar-expanded]) .zps-badge,
+.tabbrowser-tab[zen-essential] .zps-badge {
+  display: none;
+}
+
+/* Spotlight rows */
+.urlbarView-row[dynamicType="zps"] .urlbarView-row-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.urlbarView-row[dynamicType="zps"] .zps-row-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.urlbarView-row[dynamicType="zps"] .zps-row-dot {
+  flex: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  padding: 4px;
+}
+
+.urlbarView-row[dynamicType="zps"] .zps-row-dot::before {
+  content: "";
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--identity-tab-color, currentColor);
+}
+
+.urlbarView-row[dynamicType="zps"] .zps-row-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.urlbarView-row[dynamicType="zps"] .zps-row-detail {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.6;
+}
+
+.urlbarView-row[dynamicType="zps"] .zps-badge {
+  margin-inline: 0;
+}
+
+.urlbarView-row[dynamicType="zps"] .zps-row-hint {
+  flex: none;
+  margin-inline-start: auto;
+  font-size: 11px;
+  opacity: 0.55;
+}

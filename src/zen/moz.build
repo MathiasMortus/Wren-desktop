@@ -24,4 +24,5 @@ DIRS += [
     "space-routing",
     "sync",
     "window-drag",
+    "wren-zps",
 ]
