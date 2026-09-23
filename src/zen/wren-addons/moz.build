@@ -1,0 +1,12 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Pre-installed extensions, fetched and hash-checked by scripts/wren_addons.py.
+# They land in <app>/distribution/extensions, which Firefox installs into
+# every new profile (and again after an app update) as normal add-ons.
+DIST_SUBDIR = ""
+
+FINAL_TARGET_FILES.distribution.extensions += [
+    "uBlock0@raymondhill.net.xpi",
+]
