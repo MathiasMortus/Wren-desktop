@@ -1,0 +1,13 @@
+diff --git a/browser/installer/package-manifest.in b/browser/installer/package-manifest.in
+index 46725ca049..5701a12b24 100644
+--- a/browser/installer/package-manifest.in
++++ b/browser/installer/package-manifest.in
+@@ -461,3 +461,8 @@ bin/libfreebl_64int_3.so
+ #if defined(BUILT_BY_MOZILLA)
+ @RESPATH@/distribution/*
+ #endif
++
++; Wren: pre-installed extensions (uBlock Origin), see src/zen/wren-addons
++#if !defined(BUILT_BY_MOZILLA)
++@RESPATH@/distribution/extensions/*
++#endif
