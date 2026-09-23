@@ -1,6 +1,6 @@
 {
-  "name": "Zen Browser",
-  "vendor": "Zen OSS Team",
+  "name": "Wren Browser",
+  "vendor": "Wren",
   "appId": "zen",
   "binaryName": "zen",
   "version": {
@@ -16,13 +16,13 @@
   "brands": {
     "release": {
       "backgroundColor": "#282A33",
-      "brandShorterName": "Zen",
-      "brandShortName": "Zen",
-      "brandFullName": "Zen Browser",
+      "brandShorterName": "Wren",
+      "brandShortName": "Wren",
+      "brandFullName": "Wren Browser",
       "release": {
         "displayVersion": "1.22.3b",
         "github": {
-          "repo": "zen-browser/desktop"
+          "repo": "MathiasMortus/Wren-desktop"
         },
         "archives": {
           "windows": "windows.mar",
