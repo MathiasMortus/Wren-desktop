@@ -62,6 +62,8 @@ fi
 
 if [[ "$BEHIND" != "0" ]]; then
   say "Merging Zen $TARGET ($BEHIND commits)"
+  # .gitattributes keeps Wren's README (merge=ours); the driver must exist.
+  git config merge.ours.driver true
   if ! git merge --no-edit -m "wren: Merge Zen $TARGET" "$TARGET"; then
     fail "the merge has conflicts, most likely in a patch Wren also changed.
 Fix them (git status lists them), commit, then run apply again.

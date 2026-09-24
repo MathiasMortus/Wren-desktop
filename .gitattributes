@@ -6,3 +6,7 @@
 *.d.ts linguist-language=TypeScript
 
 src/zen/tests/** linguist-language=C++
+
+# Wren: always keep Wren's README when merging Zen, which rewrites its own README on
+# every Firefox update. Needs `git config merge.ours.driver true` (wren_update.sh sets it).
+README.md merge=ours
