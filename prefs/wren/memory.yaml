@@ -1,0 +1,108 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Wren trades a little speed in rare cases for a lot less memory. Measured
+# on a 12-tab session, nearly this set of Firefox prefs used about 320 MB
+# (12%) less than the defaults. Each entry says what it costs.
+#
+# Most of these override prefs Firefox defines itself (several of them in
+# StaticPrefList.yaml). They are written as plain defaults, without `type:
+# static`, so they only change the value and do not define the pref twice.
+
+# Don't keep a hidden, ready-made new-tab page. Wren opens the floating URL
+# bar for a new tab, so that page was loaded and never shown.
+# Cost: about:newtab and about:home paint a fraction of a second later.
+- name: browser.newtab.preload
+  value: false
+
+# Keep 1 empty web process ready for the next new site instead of 3.
+# Cost: opening several new sites at once (a bookmark folder, a page full of
+# third-party frames) starts the extra processes on demand, a little slower
+# on macOS. Firefox already does this on computers with 4 GB of RAM or less.
+- name: dom.ipc.processPrelaunch.fission.number
+  value: 1
+
+# When a web process has had no tab in view for 10 seconds, it cleans up: a
+# full garbage collection, and it drops decoded images, font and script
+# caches that it can rebuild. Processes that play sound are left alone.
+# Value 2 is that clean-up; 3 would also tell the JS engine that memory is
+# low and never tell it otherwise.
+# Cost: a moment of work in that hidden process, and a tab you come back to
+# re-decodes its images and is briefly slower. If you return in the middle of
+# the clean-up, the tab waits for it to finish.
+- name: dom.memory.memory_pressure_on_background
+  value: 2
+
+# The 10 seconds above: how long a web process waits after its last visible
+# tab is hidden before it counts as in the background. It keeps flipping
+# through tabs from starting a clean-up for each one.
+# Cost: on macOS the switch to low-priority, low-power threads for hidden
+# tabs comes 10 seconds later too.
+- name: dom.ipc.processPriorityManager.backgroundGracePeriodMS
+  value: 10000
+
+# A process that has had no input for 30 seconds (Firefox: 5 minutes)
+# compacts its JavaScript memory. It waits while the page is animating and
+# stops when you come back.
+# Cost: compiled JavaScript is thrown away, so the first action after a pause
+# is briefly slower.
+- name: javascript.options.compact_on_user_inactive_delay
+  value: 30000
+
+# Turn off Mozilla's heap checker. It puts a sample of memory allocations on
+# their own guarded pages to catch bugs for Mozilla's crash reports, which
+# Wren does not send. Up to about 1 MB per process.
+# Cost: a use-after-free bug that would have hit a guarded page no longer
+# crashes cleanly.
+- name: memory.phc.enabled
+  value: false
+
+# Keep at most 4 pages (Firefox: 8) frozen in memory for instant Back and
+# Forward, counted across all tabs...
+- name: browser.sessionhistory.max_total_viewers
+  value: 4
+
+# ...and for about 10 minutes (Firefox: 30). Value in seconds; applies to
+# tabs opened after it is set.
+# Cost of both: going Back to an older page loads it again instead of
+# showing it instantly, and what you had typed or expanded there may be gone.
+- name: browser.sessionhistory.contentViewerTimeout
+  value: 600
+
+# Linux: buffer at most 128 MB of a plain video or audio file per process
+# (Firefox: 500 MB). Value in KiB. The buffer is a temporary file in /tmp,
+# which is kept in RAM on most Linux systems. Streaming sites such as
+# YouTube, Netflix and Twitch do not use it.
+# Cost: seeking far back in a long video file downloads that part again.
+- name: media.cache_size
+  value: 131072
+  condition: "defined(MOZ_WIDGET_GTK)"
+
+# macOS: when the system reports that memory is critically low, unload
+# background tabs that have not been used for 10 minutes (bit 1) and tell
+# every process to clean up (bit 2). Firefox ships this only in Nightly.
+# Cost: an unloaded tab reloads when you return to it.
+# TabUnloader-sys-mjs.patch makes this keep awake every tab that Wren's own
+# sleeping tabs keep awake (a pane on screen in a split view or glance, an
+# excluded host, ...). Without it a tab on screen in a split view could be
+# unloaded.
+- name: browser.lowMemoryResponseMask
+  value: 3
+  condition: "defined(XP_MACOSX)"
+
+# Idle clean-up: src/zen/wren-memory/WrenMemory.sys.mjs
+
+# When Wren has had no keyboard or mouse input for a few minutes, ask every
+# process once to clean up, the browser itself and extensions included.
+# Nothing happens while a tab plays sound, a video is fullscreen, on screen
+# or in Picture-in-Picture, or the camera, microphone or screen is shared.
+# Cost: Back after a break reloads the page, and the first new site opened
+# afterwards starts a little slower.
+- name: wren.memory.idle-minimize.enabled
+  value: true
+
+# How long Wren must be left alone before that clean-up, in seconds.
+# Values below 1 count as 1, values above a day as a day.
+- name: wren.memory.idle-minimize.delay-seconds
+  value: 300

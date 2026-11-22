@@ -25,5 +25,6 @@ DIRS += [
     "sync",
     "window-drag",
     "wren-addons",
+    "wren-memory",
     "wren-zps",
 ]

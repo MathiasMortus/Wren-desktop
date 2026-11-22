@@ -1,0 +1,19 @@
+<!-- Any copyright is dedicated to the Public Domain.
+   - https://creativecommons.org/publicdomain/zero/1.0/ -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>A page with a form</title>
+  <script>
+    // The test asks for an alert through an event, so that the alert comes
+    // from the page. Later, so the test is not blocked while it is open.
+    window.addEventListener("wren-open-alert", () => {
+      setTimeout(() => alert("Still there?"), 0);
+    });
+  </script>
+</head>
+<body>
+  <input id="text" type="text">
+</body>
+</html>

@@ -52,6 +52,12 @@ def main():
   # Collect any additional arguments
   other_args = [arg for arg in args if arg != path]
 
+  # Wren: the mochitest harness installs everything in
+  # <app>/distribution/extensions into the test profile. uBlock Origin then
+  # fetches its filter lists a few seconds after startup, and the harness
+  # aborts the run on that non-local connection.
+  other_args.append("--exclude-extension=uBlock0@raymondhill.net.xpi")
+
   engine_dir = project_root / 'engine'
   os.chdir(engine_dir)
 

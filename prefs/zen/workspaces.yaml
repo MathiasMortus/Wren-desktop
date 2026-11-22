@@ -42,8 +42,11 @@
   value: "@cond"
   condition: "!defined(MOZILLA_OFFICIAL)" # Section: Pinned tabs management
 
+# Wren: false. Wren puts idle pinned tabs to sleep (wren.tab-unloader), and
+# with true a middle-click on a sleeping pinned tab closes it instead of
+# resetting it. The close button still closes it on purpose.
 - name: zen.pinned-tab-manager.wheel-close-if-pending
-  value: true
+  value: false
 
 - name: zen.pinned-tab-manager.debug
   value: false

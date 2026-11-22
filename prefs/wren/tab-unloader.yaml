@@ -1,0 +1,63 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Sleeping tabs: src/zen/wren-memory/WrenTabUnloader.sys.mjs
+#
+# A tab that has not been used for a while is unloaded. It stays in the
+# sidebar with a dimmed icon and loads again, where you left it, when you
+# select it. This is the largest memory saving in Wren: measured at about
+# 130 MB per sleeping tab.
+# Cost: a sleeping tab takes a moment to load when you come back, and it
+# does nothing in the meantime. A chat or mail page does not notify you,
+# and text typed into a page's own editor can be lost.
+#
+# Never put to sleep: the tab you are looking at (in any window, split view
+# or glance), tabs that play sound or video, are in Picture-in-Picture or in
+# a call, tabs in private windows, pages that ask before you leave them or
+# have a dialog open, and pages that are not web pages (settings, add-on
+# pages). A video that has been silent from the start does not count as
+# playing.
+#
+# A glance and the tab it was opened from stay awake for as long as the
+# glance exists, also after you switch to another tab without closing it.
+#
+# When the system runs low on memory, Firefox unloads tabs on its own
+# (macOS and Windows). It keeps the same tabs awake, and follows the prefs
+# below except enabled and timeout-minutes.
+#
+# All of these apply at once, without a restart.
+
+# Turn sleeping tabs on or off.
+- name: wren.tab-unloader.enabled
+  value: true
+
+# How many minutes a tab must go unused before it is put to sleep. Only time
+# with the computer awake and Wren running counts, so tabs are not all put to
+# sleep the moment a laptop wakes up or Wren starts. Values below 1 count
+# as 1.
+- name: wren.tab-unloader.timeout-minutes
+  value: 60
+
+# Pinned tabs go to sleep too. Set to false to keep them loaded.
+- name: wren.tab-unloader.unload-pinned
+  value: true
+
+# Essentials go to sleep too. Set to false to keep them loaded. This one
+# decides for Essentials on its own: unload-pinned does not apply to them.
+- name: wren.tab-unloader.unload-essentials
+  value: true
+
+# Sites that are never put to sleep: host names separated by commas, for
+# example "mail.example.com, chat.example.org". A name also covers its
+# subdomains, so "example.com" covers "mail.example.com".
+- name: wren.tab-unloader.excluded-hosts
+  value: ""
+
+# Keeps every site awake that you have allowed to show notifications. Those
+# are mostly mail, chat and calendar pages, which can only notify you while
+# they are loaded, so putting them to sleep would silently break them. On by
+# default for that reason. Set to false to let them sleep too and save more
+# memory.
+- name: wren.tab-unloader.keep-notification-sites
+  value: true
