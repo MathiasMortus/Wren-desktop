@@ -2,7 +2,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+# Wren: always true. Wren opens its own welcome page (resource://wren-welcome/)
+# and never shows Zen's welcome wizard. Zen ties this to MOZILLA_OFFICIAL, which
+# Wren now sets for every build; with Zen's value the wizard would start once on
+# an existing profile.
 - name: zen.welcome-screen.seen
-  value: "@cond"
+  value: true
   sticky: true
-  condition: "!defined(MOZILLA_OFFICIAL)"

@@ -7,8 +7,12 @@
 
 # === Mark: Site Injection ===
 
+# Wren: no web site may install mods. Pages matching this pattern get
+# window.ZenInstallMod(), which installs a mod (browser UI CSS and new prefs)
+# from Zen's store without asking. Zen gives that to zen-browser.app; Wren
+# gives it to a host that can never resolve (.invalid, RFC 2606).
 - name: zen.injections.match-urls
-  value: "https://zen-browser.app/*"
+  value: "https://wren.invalid/*"
   locked: true
   condition: "defined(MOZILLA_OFFICIAL)"
 

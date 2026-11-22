@@ -7,8 +7,12 @@ ChromeUtils.defineESModuleGetters(this, {
   ContextualIdentityService:
     "moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs",
   ProvidersManager: "moz-src:///browser/components/urlbar/UrlbarProvidersManager.sys.mjs",
+  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
+  SearchTestUtils: "resource://testing-common/SearchTestUtils.sys.mjs",
   UrlbarTestUtils: "resource://testing-common/UrlbarTestUtils.sys.mjs",
 });
+
+SearchTestUtils.init(this);
 
 const PROFILE_NAME = "ZpsTest";
 
@@ -89,4 +93,82 @@ add_task(async function test_open_link_in_a_new_profile() {
   );
 
   BrowserTestUtils.removeTab(tab);
+});
+
+// Text that is not a web address is searched for with the default search
+// engine, in the profile.
+add_task(async function test_search_in_a_profile() {
+  const profile = findTestProfile();
+  Assert.ok(profile, "The test profile exists");
+
+  await SearchTestUtils.installSearchExtension(
+    {
+      name: "ZpsTestEngine",
+      search_url: "https://example.com/",
+      search_url_get_params: "q={searchTerms}",
+    },
+    { setAsDefault: true }
+  );
+
+  await searchRows(`/profile ${PROFILE_NAME} two words`);
+  const newTab = BrowserTestUtils.waitForNewTab(gBrowser, "https://example.com/?q=two+words");
+  EventUtils.synthesizeKey("KEY_Enter");
+  const tab = await newTab;
+
+  Assert.equal(tab.userContextId, profile.userContextId, "The search opened in the profile");
+
+  BrowserTestUtils.removeTab(tab);
+  await PlacesUtils.history.clear();
+});
+
+// The profile's own history list holds the same addresses as Firefox's
+// history, so clearing history has to clear it too.
+add_task(async function test_clearing_history_clears_profile_history() {
+  const profile = findTestProfile();
+  Assert.ok(profile, "The test profile exists");
+  const url = "https://example.com/";
+
+  const historyRows = async () => {
+    const rows = await searchRows(`/profile ${PROFILE_NAME} `);
+    await UrlbarTestUtils.promisePopupClose(window);
+    return rows.filter(result => result.payload.kind === "history");
+  };
+  const visit = async () => {
+    const tab = BrowserTestUtils.addTab(gBrowser, url, { userContextId: profile.userContextId });
+    await BrowserTestUtils.browserLoaded(tab.linkedBrowser);
+    await TestUtils.waitForCondition(
+      () => PlacesUtils.history.fetch(url),
+      "Firefox's history has the page"
+    );
+    await TestUtils.waitForCondition(
+      async () => (await historyRows()).some(result => result.payload.target.url === url),
+      "The profile's history has the page"
+    );
+    BrowserTestUtils.removeTab(tab);
+  };
+
+  await visit();
+  await PlacesUtils.history.remove(url);
+  await TestUtils.waitForCondition(
+    async () => !(await historyRows()).some(result => result.payload.target.url === url),
+    "Removing the page from history removes it from the profile's history"
+  );
+
+  await visit();
+  await PlacesUtils.history.clear();
+  await TestUtils.waitForCondition(
+    async () => !(await historyRows()).length,
+    "Clearing history clears the profile's history"
+  );
+
+  await SpecialPowers.pushPrefEnv({ set: [["places.history.enabled", false]] });
+  const tab = BrowserTestUtils.addTab(gBrowser, url, { userContextId: profile.userContextId });
+  await BrowserTestUtils.browserLoaded(tab.linkedBrowser);
+  Assert.equal(
+    (await historyRows()).length,
+    0,
+    "With history turned off, the profile's history stays empty"
+  );
+  BrowserTestUtils.removeTab(tab);
+  await SpecialPowers.popPrefEnv();
 });

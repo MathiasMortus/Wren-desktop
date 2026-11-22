@@ -1,0 +1,19 @@
+diff --git a/toolkit/components/search/SearchEngineSelector.sys.mjs b/toolkit/components/search/SearchEngineSelector.sys.mjs
+index 8c2a5b482601ac4dfa21c0a35bab82bf9fec469d..ebb36b734378f2b02a9b0cbda1dc0286776dcdcb 100644
+--- a/toolkit/components/search/SearchEngineSelector.sys.mjs
++++ b/toolkit/components/search/SearchEngineSelector.sys.mjs
+@@ -257,6 +257,14 @@ export class SearchEngineSelector {
+       );
+     }
+ 
++    // Wren: DuckDuckGo is the default search engine, whatever Mozilla's search
++    // configuration (bundled or fetched later from remote settings) picks for
++    // the locale and region. A search engine the user picked is stored
++    // separately and still wins.
++    if (refinedSearchConfig.engines.some(e => e.identifier == "ddg")) {
++      refinedSearchConfig.appDefaultEngineId = "ddg";
++    }
++
+     if (
+       !refinedSearchConfig.appDefaultEngineId ||
+       !refinedSearchConfig.engines.find(

@@ -26,6 +26,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   ProvidersManager: "moz-src:///browser/components/urlbar/UrlbarProvidersManager.sys.mjs",
+  SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
   UrlbarResult: "chrome://browser/content/urlbar/UrlbarResult.mjs",
 });
 
@@ -99,6 +100,10 @@ const History = {
   },
 
   visit(profileId, url) {
+    // "Never remember history" covers this list as well.
+    if (!Services.prefs.getBoolPref("places.history.enabled", true)) {
+      return;
+    }
     this.data.profiles[profileId] = core.recordVisit(this.entries(profileId), {
       url,
       time: Date.now(),
@@ -123,6 +128,28 @@ const History = {
     delete this.data.profiles[profileId];
     delete this.data.lastUsed[profileId];
     this.save();
+  },
+
+  // "Clear history" and "Forget about this site" have to reach this list too:
+  // it holds the same addresses and titles as Firefox's own history.
+  forgetPages(urls) {
+    const gone = new Set(urls);
+    let changed = false;
+    for (const [profileId, entries] of Object.entries(this.data.profiles)) {
+      const kept = entries.filter(e => !gone.has(e.url));
+      if (kept.length !== entries.length) {
+        this.data.profiles[profileId] = kept;
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.flush();
+    }
+  },
+
+  forgetEverything() {
+    this.data = { profiles: {}, lastUsed: {} };
+    this.flush();
   },
 
   save() {
@@ -153,7 +180,7 @@ async function openInProfile(win, profile, target) {
   if (target.type === "url") {
     url = target.url;
   } else if (target.type === "search") {
-    const engine = await Services.search.getDefault();
+    const engine = await lazy.SearchService.getDefault();
     url = engine.getSubmission(target.query).uri.spec;
   } else {
     url = win.BROWSER_NEW_TAB_URL || "about:newtab";
@@ -472,6 +499,18 @@ const identityObserver = {
   },
 };
 
+// Firefox's history tells us when pages leave it. A page whose visits were
+// only partly removed (say, "the last hour") is dropped here as well: this
+// list has no per-visit times to check, and keeping too little is the safe
+// side when someone is clearing history.
+function onHistoryChanged(events) {
+  if (events.some(event => event.type === "history-cleared")) {
+    History.forgetEverything();
+    return;
+  }
+  History.forgetPages(events.filter(event => event.type === "page-removed").map(event => event.url));
+}
+
 export const ZPS = {
   initialized: false,
 
@@ -488,6 +527,7 @@ export const ZPS = {
     lazy.AsyncShutdown.profileBeforeChange.addBlocker("ZPS: save history", () => History.flush());
 
     IDENTITY_TOPICS.forEach(topic => Services.obs.addObserver(identityObserver, topic));
+    PlacesObservers.addListener(["history-cleared", "page-removed"], onHistoryChanged);
     Services.obs.addObserver(win => initWindow(win), "browser-delayed-startup-finished");
   },
 };

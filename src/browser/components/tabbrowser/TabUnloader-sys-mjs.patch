@@ -1,9 +1,9 @@
 diff --git a/browser/components/tabbrowser/TabUnloader.sys.mjs b/browser/components/tabbrowser/TabUnloader.sys.mjs
-index a6d6c5405f98c839b7c0f2007e053e874bb7ce07..d8021d9b67b81fa5f3545fe353023cd269d87807 100644
+index ac31a260565465c062b31fdd204acc86324fefbe..cc10ddcaac46ae1f9b479c817e09a4b2714700bb 100644
 --- a/browser/components/tabbrowser/TabUnloader.sys.mjs
 +++ b/browser/components/tabbrowser/TabUnloader.sys.mjs
-@@ -13,6 +13,7 @@ const lazy = {};
- ChromeUtils.defineESModuleGetters(lazy, {
+@@ -13,6 +13,7 @@ import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+ const lazy = XPCOMUtils.declareLazy({
    PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
    webrtcUI: "resource:///modules/webrtcUI.sys.mjs",
 +  WrenTabUnloader: "resource:///modules/zen/memory/WrenTabUnloader.sys.mjs",
