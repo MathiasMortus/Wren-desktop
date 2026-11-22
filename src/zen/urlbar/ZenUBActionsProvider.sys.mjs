@@ -5,7 +5,10 @@
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 import { UrlbarProvider } from "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs";
 import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
-import { globalActions } from "resource:///modules/ZenUBGlobalActions.sys.mjs";
+import {
+  globalActions,
+  labelFor,
+} from "resource:///modules/ZenUBGlobalActions.sys.mjs";
 import { zenUrlbarResultsLearner } from "./ZenUBResultsLearner.sys.mjs";
 
 const lazy = {};
@@ -18,15 +21,20 @@ const MAX_RECENT_ACTIONS = 5;
 const MINIMUM_QUERY_SCORE = 92;
 const MINIMUM_PREFIXED_QUERY_SCORE = 30;
 
+// Exact and prefix matches must outrank any fuzzy match. The fuzzy score grows
+// quadratically with a run of consecutive matches, so a longer label that merely
+// contains the query ("Reopen Closed Tab" for "close tab") could beat the label
+// that is exactly the query.
+const EXACT_MATCH_SCORE = 1_000_000;
+const PREFIX_MATCH_SCORE = 100_000;
+
 ChromeUtils.defineESModuleGetters(lazy, {
   UrlbarResult: "chrome://browser/content/urlbar/UrlbarResult.mjs",
   BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
   AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
   UrlUtils: "resource://gre/modules/UrlUtils.sys.mjs",
-});
-
-ChromeUtils.defineLazyGetter(lazy, "l10n", () => {
-  return new Localization(["browser/zen-command-palette.ftl"], true);
+  ZenKeyboardShortcuts:
+    "resource:///modules/zen/kbs/ZenKeyboardShortcuts.sys.mjs",
 });
 
 XPCOMUtils.defineLazyPreferenceGetter(
@@ -180,7 +188,7 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
           .workspaceElement(workspace.uuid)
           ?.style.getPropertyValue("--zen-primary-color");
         actions.push({
-          label: lazy.l10n.formatValueSync("zen-action-focus-on"),
+          label: labelFor("zen-action-focus-on"),
           extraPayload: {
             workspaceId: workspace.uuid,
             prettyName: workspace.name,
@@ -213,7 +221,7 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
       .map(addon => {
         return {
           icon: "chrome://browser/skin/zen-icons/extension.svg",
-          label: lazy.l10n.formatValueSync("zen-action-extension"),
+          label: labelFor("zen-action-extension"),
           commandId: `zen:extension-${addon.id}`,
           extraPayload: {
             extensionId: addon.id,
@@ -298,11 +306,11 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
     }
     // 1. Exact match gets the highest score.
     if (targetLower === queryLower) {
-      return 200;
+      return EXACT_MATCH_SCORE;
     }
     // 2. Exact prefix matches are heavily prioritized.
     if (targetLower.startsWith(queryLower)) {
-      return 100 + queryLen;
+      return PREFIX_MATCH_SCORE + queryLen;
     }
     let score = 0;
     let queryIndex = 0;
@@ -379,7 +387,8 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
             : queryContext.searchString,
         icon: action.icon,
         shortcutContent:
-          ownerGlobal.gZenKeyboardShortcutsManager.getShortcutDisplayFromCommand(
+          lazy.ZenKeyboardShortcuts.getShortcutDisplayFromCommand(
+            ownerGlobal,
             action.command
           ),
         keywords: action.label.split(" "),
@@ -410,12 +419,16 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
       finalResults.push(result);
     }
     let i = 0;
+    let shown = 0;
     zenUrlbarResultsLearner
       .sortCommandsByPriority(finalResults)
       .forEach(result => {
         if (isPrefixed && !isWorkspaceSearch && i === 0 && query.length > 1) {
           result.heuristic = true;
           delete result.suggestedIndex;
+        } else if (typeof result.suggestedIndex === "number") {
+          result.suggestedIndex += shown;
+          shown++;
         }
         addCallback(this, result);
         i++;

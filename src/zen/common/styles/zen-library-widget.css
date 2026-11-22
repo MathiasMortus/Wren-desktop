@@ -6,35 +6,45 @@
 }
 
 #zen-sidebar-foot-buttons,
-#tabbrowser-tabs {
+#TabsToolbar-customization-target {
   --zen-library-open-duration: 0.3s;
   --zen-library-open-easing: cubic-bezier(0.22, 1, 0.36, 1);
   --zen-library-entry-easing: linear(0, 0.34 12%, 0.7 24%, 0.93 38%, 1.03 55%, 1);
-  transition: --zen-library-progress var(--zen-library-open-duration) var(--zen-library-open-easing);
+}
 
-  &[zen-library-stack-open] {
-    --zen-library-progress: 1;
-  }
+#zen-sidebar-foot-buttons {
+  z-index: 2;
 }
 
 #zen-library-button {
   position: relative;
 
-  --zen-library-sprite-size: 18px;
-  &::before {
-    content: "";
+  --zen-library-sprite-size: 20px;
+
+  & .zen-library-sprite {
     position: absolute;
     width: var(--zen-library-sprite-size);
     height: var(--zen-library-sprite-size);
+    overflow: clip;
+    pointer-events: none;
+  }
+
+  & .zen-library-sprite::before {
+    content: "";
+    display: block;
+    flex: none;
+    width: calc(36 * 100%);
+    height: 100%;
     background-image: url("chrome://browser/skin/zen-icons/library/library-sprite.svg");
-    scale: 1.08;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    &::before {
+    & .zen-library-sprite::before {
       animation: zen-library-sprite-unhover 0.3s steps(36, jump-none);
     }
-    &:hover::before {
+    &:hover .zen-library-sprite::before {
       animation: zen-library-sprite-hover 0.35s steps(36, jump-none) forwards;
     }
   }
@@ -52,12 +62,15 @@
     animation: 0.4s library-badge-download ease;
   }
 
-  /* The badge flies from its spot on the button to the newest entry's badge
+  /* The badge flies from its spot on the button to the matching entry's badge
    * along an arc, the target being set as the list opens. */
   & #library-button-badge {
     position: absolute;
     margin: 0 !important;
     transform-origin: left top;
+
+    --zen-library-progress: 0;
+    transition: --zen-library-progress var(--zen-library-open-duration) var(--zen-library-open-easing);
 
     --zen-library-badge-x: 14px;
     --zen-library-badge-y: -8px;
@@ -72,33 +85,44 @@
         abs(var(--zen-library-badge-to-x) - var(--zen-library-badge-x)) / 2
     );
     --zen-library-left: calc(1 - var(--zen-library-progress));
-    left: calc(
+    --zen-library-badge-tx: calc(
       var(--zen-library-left) * var(--zen-library-left) * var(--zen-library-badge-x) +
         2 * var(--zen-library-left) * var(--zen-library-progress) * var(--zen-library-badge-mid-x) +
         var(--zen-library-progress) * var(--zen-library-progress) * var(--zen-library-badge-to-x)
     );
-    top: calc(
+    --zen-library-badge-ty: calc(
       var(--zen-library-left) * var(--zen-library-left) * var(--zen-library-badge-y) +
         2 * var(--zen-library-left) * var(--zen-library-progress) * var(--zen-library-badge-mid-y) +
         var(--zen-library-progress) * var(--zen-library-progress) * var(--zen-library-badge-to-y)
     );
 
+    left: 0;
+    top: 0;
+
+    scale: none;
+
     &:not([downloading]) {
-      transform: scale(calc((var(--zen-library-progress) * 0.5 + 0.5) * 100%));
+      transform: translate(var(--zen-library-badge-tx), var(--zen-library-badge-ty))
+        scale(calc((var(--zen-library-progress) + 1) * 100%));
     }
 
     &[downloading] {
-      transform: scale(calc((var(--zen-library-progress) * 0.2 + 0.8) * 100%));
+      transform: translate(var(--zen-library-badge-tx), var(--zen-library-badge-ty))
+        scale(calc((var(--zen-library-progress) * 0.2 + 0.8) * 100%));
     }
   }
 }
 
+#zen-sidebar-foot-buttons[zen-library-stack-open] #library-button-badge {
+  --zen-library-progress: 1;
+}
+
 #library-button-badge,
-#zen-sidebar-foot-buttons[zen-library-badge] #zen-library-download-list > :last-child .zen-library-download-badge {
+#zen-sidebar-foot-buttons[zen-library-badge] #zen-library-download-list > [badge-target] .zen-library-download-badge {
   visibility: hidden;
 }
 
-#zen-sidebar-foot-buttons[zen-library-badge] {
+:root:not([inDOMFullscreen="true"]) #zen-sidebar-foot-buttons[zen-library-badge] {
   & #library-button-badge {
     visibility: visible;
   }
@@ -106,10 +130,12 @@
   &[zen-library-stack-open] {
     & #library-button-badge {
       visibility: hidden;
-      transition: visibility 0s var(--zen-library-open-duration);
+      transition:
+        visibility 0s var(--zen-library-open-duration),
+        --zen-library-progress var(--zen-library-open-duration) var(--zen-library-open-easing);
     }
 
-    & #zen-library-download-list > :last-child .zen-library-download-badge {
+    & #zen-library-download-list > [badge-target] .zen-library-download-badge {
       visibility: visible;
       transition: visibility 0s var(--zen-library-open-duration);
     }
@@ -122,8 +148,8 @@
 
 .zen-library-download-badge:not([downloading]) {
   background-image: var(--download-image);
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-medium);
+  height: var(--icon-size-medium);
   border-radius: var(--border-radius-xsmall);
   background-size: cover;
   scale: 2;
@@ -138,15 +164,13 @@
   align-self: start;
   transform: translateX(-2px);
 
-  --border-color: color-mix(in srgb, var(--zen-primary-color), light-dark(rgba(0,0,0,.8), white) 70%);
-
-  background-color: color-mix(in srgb, var(--zen-primary-color), light-dark(white, rgba(0,0,0,.5)) 80%);
+  background-color: color-mix(in srgb, var(--zen-primary-color), var(--zen-library-download-badge-mix-color) 80%);
   border: 3px solid transparent;
-  box-shadow: 0 0 6px 2px rgba(0,0,0,.1);
-  color: var(--border-color);
-  width: 25px;
-  height: 25px;
-  border-radius: 100%;
+  box-shadow: var(--zen-box-shadow-glow);
+  color: var(--zen-library-widget-progress-color);
+  width: var(--zen-size-25);
+  height: var(--zen-size-25);
+  border-radius: var(--zen-border-radius-round);
 
   position: relative;
 }
@@ -158,7 +182,7 @@
   position: absolute;
   content: '';
   background-size: contain;
-  inset: 2px;
+  inset: var(--zen-space-2);
   fill: currentColor;
   -moz-context-properties: fill;
 }
@@ -166,30 +190,30 @@
 .zen-library-download-progress {
   position: absolute;
   inset: 1px;
-  border-radius: 50%;
 
-  --badge-size: 25px;
-  --border-width: 4px;
-  --size: calc(var(--badge-size) + 2 * var(--border-width));
-  margin: calc(-1 * var(--border-width));
+  --zen-library-widget-progress-border-width: 4px;
+  margin: calc(-1 * var(--zen-library-widget-progress-border-width));
 
   --thickness: 3px;
-  --progress: var(--zen-accent-button-background);
+  --zen-library-widget-progress-color: var(--zen-accent-button-background);
 
-  background:
-    conic-gradient(
-        from 0deg,
-        var(--progress) calc(var(--value) * 1%),
-        transparent 0
-      )
-      border-box,
-    var(--border-color) border-box;
+  border-radius: var(--border-radius-circle);
 
-  mask: radial-gradient(
-    circle closest-side,
-    transparent calc(100% - var(--thickness)),
-    black calc(100% - var(--thickness))
-  );
+  & circle {
+    fill: none;
+    stroke-width: var(--thickness);
+  }
+
+  & .zen-library-download-progress-track {
+    stroke: currentColor;
+  }
+
+  & .zen-library-download-progress-arc {
+    stroke: var(--zen-library-widget-progress-color);
+    stroke-dasharray: 0 100;
+    rotate: -90deg;
+    transform-origin: center;
+  }
 }
 
 #zen-sidebar-foot-buttons:is([zen-library-stack-open], [zen-library-stack-closing]) {
@@ -214,28 +238,30 @@
   display: flex;
   flex-direction: column;
   padding: 0;
-  padding-top: 10px;
-  gap: 4px;
+  padding-top: var(--zen-space-10);
+  gap: var(--zen-space-4);
 
   .zen-library-download-list-download {
-    container-type: inline-size;
     -moz-window-dragging: no-drag;
 
-    height: 52px;
-    border-radius: 16px;
+    height: var(--zen-size-52);
+    border-radius: var(--zen-border-radius-16);
     display: flex;
     position: relative;
-    padding: 0 4px;
+    padding: 0 var(--zen-space-4);
 
-    --zen-library-progress: 0;
     --zen-library-entry-index: 0;
     --zen-library-entry-delay: calc(var(--zen-library-entry-index) * 12ms);
     --zen-library-entry-settle: 0s;
     transition:
-      --zen-library-progress 0.22s var(--zen-library-entry-easing) var(--zen-library-entry-delay),
+      transform 0.22s var(--zen-library-entry-easing) var(--zen-library-entry-delay),
+      opacity 0.22s var(--zen-library-entry-easing) var(--zen-library-entry-delay),
       pointer-events 0s var(--zen-library-entry-settle) allow-discrete;
 
     pointer-events: none;
+
+    transform: translateY(25px);
+    opacity: 0;
 
     &:nth-last-child(2) {
       --zen-library-entry-index: 1;
@@ -248,20 +274,18 @@
     }
 
     #zen-sidebar-foot-buttons[zen-library-stack-open] & {
-      --zen-library-progress: 1;
       --zen-library-entry-settle: calc(0.22s + var(--zen-library-entry-delay));
       pointer-events: auto;
+      transform: translateY(0);
+      opacity: 1;
     }
-
-    transform: translateY(calc((1 - var(--zen-library-progress)) * 25px));
-    opacity: var(--zen-library-progress);
 
     &:hover {
       background: var(--zen-toolbar-element-bg);
     }
 
     & .zen-library-download-list-title-container {
-      @container (max-width: 50px) {
+      :root:not([zen-sidebar-expanded="true"]) & {
         display: none !important;
       }
 
@@ -270,44 +294,73 @@
       flex: 1;
 
       & .zen-library-download-list-title {
-        font-size: 11pt;
-        opacity: 0.9;
+        font-size: var(--zen-font-size-11pt);
+        opacity: var(--zen-opacity-90);
 
         text-overflow: ellipsis;
         display: block;
         overflow: hidden;
         white-space: nowrap;
+
+        @media not (-moz-platform: macos) {
+          font-size: var(--zen-font-size-10pt);
+        }
       }
       & .zen-library-download-list-subtitle {
-        font-size: 9pt;
-        opacity: 0.6;
+        font-size: var(--zen-font-size-12);
+        opacity: var(--zen-opacity-60);
 
         text-overflow: ellipsis;
         display: block;
         overflow: hidden;
         white-space: nowrap;
+
+        @media not (-moz-platform: macos) {
+          font-size: var(--zen-font-size-8pt);
+        }
       }
     }
 
     & .zen-library-download-badge {
-      margin: auto 20px auto 8px;
-      @container (max-width: 50px) {
+      margin: auto var(--zen-space-20) auto var(--zen-space-8);
+
+      &[downloading] {
+        margin-right: var(--zen-space-15);
+      }
+
+      :root:not([zen-sidebar-expanded="true"]) & {
         margin: auto;
       }
     }
 
     & .zen-library-download-action {
       display: none;
-      margin: auto 4px auto 0;
+      margin: auto var(--zen-space-4) auto 0;
 
-      @container (max-width: 50px) {
+      & > .toolbarbutton-icon {
+        width: var(--zen-size-28);
+        height: var(--zen-size-28);
+      }
+
+      :root:not([zen-sidebar-expanded="true"]) & {
         display: none !important;
       }
     }
 
     &[downloading] .zen-library-download-action {
-      display: flex;
       list-style-image: url("chrome://browser/skin/zen-icons/close.svg");
+    }
+
+    &[show-in-folder] .zen-library-download-action {
+      list-style-image: url("chrome://browser/skin/zen-icons/folder.svg");
+
+      @media (-moz-platform: macos) {
+        list-style-image: url("chrome://browser/skin/zen-icons/search-glass.svg");
+      }
+    }
+
+    &:is([downloading], [show-in-folder]):hover .zen-library-download-action {
+      display: flex;
     }
   }
 }

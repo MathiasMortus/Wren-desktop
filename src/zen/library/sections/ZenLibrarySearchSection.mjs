@@ -64,7 +64,7 @@ export class ZenLibrarySearchSection extends MozLitElement {
    *
    * @returns {{id: string, titleL10nId: string, exclusive?: boolean,
    *            options: {id: string, l10nId?: string, label?: string,
-   *                      icon?: string}[]}[]}
+   *                      icon?: string, disabled?: boolean}[]}[]}
    */
   get filterGroups() {
     return [];
@@ -180,6 +180,7 @@ export class ZenLibrarySearchSection extends MozLitElement {
       <button
         class="zen-library-filter-chip"
         ?active=${this.isFilterActive(group.id, option.id)}
+        ?disabled=${option.disabled}
         @click=${() => this.#toggleFilter(group, option.id)}
       >
         ${when(option.icon, () => html`<img src=${option.icon} alt="" />`)}
@@ -190,6 +191,35 @@ export class ZenLibrarySearchSection extends MozLitElement {
         }
       </button>
     `;
+  }
+
+  renderTopButton() {
+    if (!this.filterGroups.length) {
+      return null;
+    }
+    return html`
+      <button
+        class="zen-library-filter-button"
+        @click=${() => {
+          this.filtersOpen = true;
+        }}
+      >
+        <img
+          src="chrome://browser/skin/zen-icons/circle-bars-filter.svg"
+          draggable="false"
+          alt=""
+        />
+        <span data-l10n-id="library-filter-button"></span>
+      </button>
+    `;
+  }
+
+  renderPanel() {
+    return this.#renderFilterPanel();
+  }
+
+  renderFooter() {
+    return null;
   }
 
   #renderFilterPanel() {
@@ -223,8 +253,40 @@ export class ZenLibrarySearchSection extends MozLitElement {
     `;
   }
 
+  #faded = false;
+
+  async onShown() {
+    if (this.#faded) {
+      this.removeAttribute("fade-in");
+    } else {
+      this.#faded = true;
+      this.setAttribute("fade-in", "true");
+    }
+    await this.updateComplete;
+    this.focusSearch();
+  }
+
+  onEscape() {
+    if (!this.filtersOpen) {
+      return false;
+    }
+    this.filtersOpen = false;
+    return true;
+  }
+
+  /** Called when the library opens on this section, already shown. */
+  async onLibraryOpened() {
+    await this.updateComplete;
+    this.focusSearch();
+  }
+
+  /** Puts the keyboard in the search field, which is what it is here for. */
+  focusSearch() {
+    this.querySelector(".zen-library-search-box input")?.focus();
+  }
+
   render() {
-    const hasFilters = !!this.filterGroups.length;
+    const topButton = this.renderTopButton();
     return html`
       <div class="zen-library-search-top" ?open=${this.filtersOpen}>
         <div class="zen-library-search-header" ?inert=${this.filtersOpen}>
@@ -239,27 +301,15 @@ export class ZenLibrarySearchSection extends MozLitElement {
               @input=${this.#onSearchInput}
             />
           </div>
-          ${when(
-            hasFilters,
-            () => html`
-              <button
-                class="zen-library-filter-button"
-                @click=${() => {
-                  this.filtersOpen = true;
-                }}
-              >
-                <img src="chrome://browser/skin/zen-icons/sliders.svg" alt="" />
-                <span data-l10n-id="library-filter-button"></span>
-              </button>
-            `
-          )}
+          ${topButton}
         </div>
-        ${when(hasFilters, () => this.#renderFilterPanel())}
+        ${when(!!topButton, () => this.renderPanel())}
       </div>
       <div class="zen-library-search-results">
         ${this.renderItems()}
         <div class="zen-library-search-sentinel"></div>
       </div>
+      ${this.renderFooter()}
     `;
   }
 }

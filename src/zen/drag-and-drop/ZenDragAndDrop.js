@@ -107,6 +107,12 @@
         "zen.tabs.dnd-switch-space-delay",
         1000
       );
+      XPCOMUtils.defineLazyPreferenceGetter(
+        this,
+        "_prefsShowNewTabButtonTop",
+        "zen.view.show-newtab-button-top",
+        true
+      );
 
       ChromeUtils.defineESModuleGetters(
         this,
@@ -226,7 +232,7 @@
         // image which we can't control, so force some extra contrast for
         // the tab to be more visible. This is a hacky workaround.
         tabClone.style.colorScheme = "light";
-        tabClone.style.setProperty("--tab-selected-textcolor", "black");
+        tabClone.style.setProperty("--tab-text-color-selected", "black");
       }
       if (i > 0) {
         tabClone.style.transform = `translate(${i * 4}px, -${i * (tabRect.height - 4)}px)`;
@@ -648,7 +654,7 @@
         dropBefore = true;
       }
       this._setDragOverGroupColor(colorCode);
-      this._tabbrowserTabs.toggleAttribute("movingtab-addToGroup", colorCode);
+      this._tabbrowserTabs.toggleAttribute("movingtab-addToGroup", !!colorCode);
       this._tabbrowserTabs.toggleAttribute("movingtab-ungroup", !colorCode);
 
       if (
@@ -669,13 +675,30 @@
     }
 
     get #dragShiftableItems() {
+      // This getter is called from the dragover hot path (once per dragover
+      // event), so doing a querySelector + building a new array each time is
+      // wasteful. Cache the result, keyed on the values it was derived from so
+      // that it is invalidated when the active workspace changes mid-drag
+      // (e.g. when dragging a tab over the workspace switcher) or when the
+      // pref is toggled.
+      const workspace = gZenWorkspaces.activeWorkspace;
+      const showNewTabButtonTop = this._prefsShowNewTabButtonTop;
+      const cache = this._dragShiftableItemsCache;
+      if (
+        cache?.workspace === workspace &&
+        cache.showNewTabButtonTop === showNewTabButtonTop
+      ) {
+        return cache.items;
+      }
       const separator = gZenWorkspaces.pinnedTabsContainer.querySelector(
         ".pinned-tabs-container-separator"
       );
       // Make sure to always return the separator at the start of the array
-      return Services.prefs.getBoolPref("zen.view.show-newtab-button-top")
+      const items = showNewTabButtonTop
         ? [separator, gZenWorkspaces.activeWorkspaceElement.newTabButton]
         : [separator];
+      this._dragShiftableItemsCache = { workspace, showNewTabButtonTop, items };
+      return items;
     }
 
     handle_dragover(event) {
@@ -695,9 +718,6 @@
       const padding = Services.prefs.getIntPref(
         "zen.workspaces.dnd-switch-padding"
       );
-      // If we are hovering over the edges of the gNavToolbox or the splitter, we
-      // can change the workspace after a short delay.
-      const splitter = document.getElementById("zen-sidebar-splitter");
       let rect = window.windowUtils.getBoundsWithoutFlushing(gNavToolbox);
       // If we are hovering over the essentials container, we can't change the workspace
       const essentialsContainer = event.target.closest(
@@ -705,13 +725,6 @@
       );
       if (essentialsContainer) {
         return { isNearLeftEdge: false, isNearRightEdge: false };
-      }
-      if (!(
-        gZenCompactModeManager.preference &&
-        gZenCompactModeManager.canHideSidebar
-      )) {
-        rect.width +=
-          window.windowUtils.getBoundsWithoutFlushing(splitter).width;
       }
       const { clientX } = event;
       const isNearLeftEdge =
@@ -757,12 +770,12 @@
         if (isExplicitMode) {
           tab.style.colorScheme = isDarkMode ? "dark" : "light";
           tab.style.setProperty(
-            "--tab-selected-textcolor",
+            "--tab-text-color-selected",
             isDarkMode ? "white" : "black"
           );
         } else {
           tab.style.colorScheme = "";
-          tab.style.removeProperty("--tab-selected-textcolor");
+          tab.style.removeProperty("--tab-text-color-selected");
         }
       }
     }
@@ -879,10 +892,17 @@
         parent.appendChild(indicator);
       }
       indicator.setAttribute("orientation", "horizontal");
-      indicator.style.setProperty("--indicator-left", `${left}px`);
-      indicator.style.setProperty("--indicator-width", `${width}px`);
-      indicator.style.top = `${Math.round(top)}px`;
-      indicator.style.removeProperty("left");
+      const style = indicator.style;
+      const vars = {
+        "--indicator-left": `${left}px`,
+        "--indicator-width": `${width}px`,
+        "--indicator-top": `${Math.round(top)}px`,
+      };
+      for (const [name, value] of Object.entries(vars)) {
+        if (style.getPropertyValue(name) !== value) {
+          style.setProperty(name, value);
+        }
+      }
       return indicator;
     }
 
@@ -896,6 +916,12 @@
       }
 
       const dt = event.dataTransfer;
+      // A dragover can carry something other than a tab, or nothing at all,
+      // and mozGetDataAt throws IndexSizeError for those rather than returning
+      // null. This is the same guard handle_spaceIconDragOver uses.
+      if (!dt.mozItemCount || dt.mozTypesAt(0)[0] !== TAB_DROP_TYPE) {
+        return;
+      }
       const draggedTab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
       if (!isTab(draggedTab)) {
         return;
@@ -1209,6 +1235,21 @@
         }
       }
       this._landingElements = landing;
+      // handle_dragend shows these again, but dragend is not guaranteed to
+      // arrive (see gh-8643 in handle_drop), and a synthesized drop has no
+      // drag session to end at all. Whatever happens, a dropped tab must not
+      // stay invisible; any real landing animation is long over by then.
+      if (landing.length) {
+        setTimeout(() => {
+          if (this._landingElements !== landing) {
+            return;
+          }
+          for (const element of landing) {
+            element.style.visibility = "";
+          }
+          delete this._landingElements;
+        }, 1000);
+      }
     }
 
     #handle_dropSwitchSpace(event) {
@@ -1293,8 +1334,17 @@
         draggedTab = draggedTab.group;
       }
       for (let item of this._tabbrowserTabs.ariaFocusableItems) {
-        item = elementToMove(item);
-        item.style.transform = "";
+        // An item mid-move may have no element to move yet, and this runs
+        // for background windows too, where window sync is repositioning
+        // tabs that are not where the indexes say. See gh-16174.
+        try {
+          item = elementToMove(item);
+        } catch (e) {
+          continue;
+        }
+        if (item) {
+          item.style.transform = "";
+        }
       }
       let animations = [];
       try {
@@ -1367,6 +1417,11 @@
         );
         for (let i = startIndex; i <= endIndex; i++) {
           let item = items[i];
+          if (!item) {
+            // The indexes come from before the move, so they can fall
+            // outside the items of a window that has already changed.
+            continue;
+          }
           if (
             !movingTabs.includes(item) &&
             !(isTabGroupLabel(item) && i == startIndex)
@@ -1392,7 +1447,10 @@
         }
         // Animate tabs in between moving out of the way
         for (let item of tabsInBetween) {
-          animateElement(elementToMove(item), translateY);
+          const element = elementToMove(item);
+          if (element) {
+            animateElement(element, translateY);
+          }
         }
         let draggedTabTranslateY =
           focusableDraggedTab.elementIndex > focusableDropElement.elementIndex
@@ -1571,7 +1629,7 @@
             (hoveringPeriphery ||
               (showIndicatorUnderNewTabButton &&
                 !(pinnedTabsCount - gBrowser._numZenEssentials))) &&
-            Services.prefs.getBoolPref("zen.view.show-newtab-button-top");
+            this._prefsShowNewTabButtonTop;
           dropElement =
             (useLastPinned
               ? this._tabbrowserTabs.ariaFocusableItems.at(pinnedTabsCount)
@@ -1634,7 +1692,7 @@
       ) {
         this.clearDragOverVisuals();
         dropElement = null;
-        return [dropElement, dropBefore];
+        return [dropBefore, dropElement];
       }
       if (
         isTabGroupLabel(draggedTab) &&
@@ -1646,7 +1704,7 @@
       ) {
         dropElement = null;
         this.clearDragOverVisuals();
-        return [dropElement, dropBefore];
+        return [dropBefore, dropElement];
       }
       if (
         isTab(dropElement) ||
@@ -1662,7 +1720,8 @@
         dropBefore =
           !showIndicatorUnderNewTabButton && this._dropsBefore(event, rect);
         const top = Math.round(dropBefore ? rect.top : rect.top + rect.height);
-        if (gZenPinnedTabManager.dragIndicator.style.top !== `${top}px`) {
+        const indicatorStyle = gZenPinnedTabManager.dragIndicator.style;
+        if (indicatorStyle.getPropertyValue("--indicator-top") !== `${top}px`) {
           shouldPlayHapticFeedback = true;
         }
         this._placeDropIndicator({
@@ -1720,6 +1779,36 @@
       };
     }
 
+    /**
+     * The essentials are a grid whose column count follows the sidebar's
+     * width and the number of tabs in it, so measuring it once at the start
+     * of a drag leaves every shift after a reflow answering for a layout
+     * that is no longer there.
+     *
+     * Counted off offsetTop rather than off the tabs' boxes, because by
+     * this point the tabs carry the transforms the drag has given them and
+     * their boxes say where they have been moved to, not where the grid
+     * put them.
+     *
+     * @param {Element?} container - The grid the tabs are laid out in
+     * @returns {number?} How many tabs a row holds, or null when there are
+     *   none to count
+     */
+    #countEssentialColumns(container) {
+      const first = container?.firstElementChild;
+      if (!first) {
+        return null;
+      }
+      let columns = 0;
+      for (const child of container.children) {
+        if (child.offsetTop !== first.offsetTop) {
+          break;
+        }
+        columns++;
+      }
+      return columns || null;
+    }
+
     // eslint-disable-next-line complexity
     #animateVerticalPinnedGridDragOver(event) {
       let draggedTab = event.dataTransfer.mozGetDataAt(TAB_DROP_TYPE, 0);
@@ -1744,13 +1833,15 @@
           numEssentials
         );
         this._fakeEssentialTab = document.createXULElement("vbox");
+        this._fakeEssentialTab.style.height =
+          "calc(var(--tab-min-height) + var(--tab-margin-block) * 2)";
         this._fakeEssentialTab.elementIndex = numEssentials;
+        this._fakeEssentialTab.setAttribute("zen-drag-placeholder", "true");
         delete dragData.animDropElementIndex;
         if (!draggedTab.hasAttribute("zen-essential")) {
           event.target
             .closest(".zen-essentials-container")
             .appendChild(this._fakeEssentialTab);
-          gZenWorkspaces.updateTabsContainers();
           pinnedTabs.push(this._fakeEssentialTab);
           this._fakeEssentialTab.getBoundingClientRect(); // Initialize layout
         }
@@ -1784,6 +1875,10 @@
       let elementMoving = usingFakeElement
         ? this._fakeEssentialTab
         : draggedTab;
+      this.#maxTabsPerRow =
+        this.#countEssentialColumns(
+          elementMoving.closest(".zen-essentials-container")
+        ) ?? this.#maxTabsPerRow;
       if (usingFakeElement) {
         movingTabs = [this._fakeEssentialTab];
       }

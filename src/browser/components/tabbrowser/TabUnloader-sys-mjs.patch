@@ -1,5 +1,5 @@
 diff --git a/browser/components/tabbrowser/TabUnloader.sys.mjs b/browser/components/tabbrowser/TabUnloader.sys.mjs
-index a6d6c5405f98c839b7c0f2007e053e874bb7ce07..6207bcc2b74612d88178b7fa7033441c61fc7d48 100644
+index a6d6c5405f98c839b7c0f2007e053e874bb7ce07..d8021d9b67b81fa5f3545fe353023cd269d87807 100644
 --- a/browser/components/tabbrowser/TabUnloader.sys.mjs
 +++ b/browser/components/tabbrowser/TabUnloader.sys.mjs
 @@ -13,6 +13,7 @@ const lazy = {};
@@ -10,7 +10,12 @@ index a6d6c5405f98c839b7c0f2007e053e874bb7ce07..6207bcc2b74612d88178b7fa7033441c
  });
  
  // If there are only this many or fewer tabs open, just sort by weight, and close
-@@ -55,7 +56,21 @@ let DefaultTabUnloaderMethods = {
+@@ -51,11 +52,25 @@ let CRITERIA_WEIGHT = 1;
+  */
+ let DefaultTabUnloaderMethods = {
+   isNonDiscardable(tab, weight) {
+-    if (tab.undiscardable || tab.selected) {
++    if (tab.undiscardable || tab.selected || tab.linkedBrowser?.zenModeActive) {
        return weight;
      }
  

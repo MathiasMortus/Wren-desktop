@@ -53,7 +53,6 @@ let JSWINDOWACTORS = {
         },
       },
     },
-    allFrames: true,
     remoteTypes: ["web", "file"],
     safeForUntrustedWebProcess: true,
     enablePreference: "zen.glance.enabled",
@@ -84,12 +83,8 @@ if (!Services.appinfo.inSafeMode) {
     },
     child: {
       esModuleURI: "resource:///actors/ZenBoostsChild.sys.mjs",
-      events: {
-        DOMDocElementInserted: {},
-      },
     },
     safeForUntrustedWebProcess: true,
-    allFrames: true,
     remoteTypes: ["web", "file"],
     enablePreference: "zen.boosts.enabled",
   };
